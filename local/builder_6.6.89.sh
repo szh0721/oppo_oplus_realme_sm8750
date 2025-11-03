@@ -382,7 +382,7 @@ fi
 # ===== 克隆并打包 AnyKernel3 =====
 cd "$WORKDIR/kernel_workspace"
 echo ">>> 克隆 AnyKernel3 项目..."
-git clone https://github.com/osm0sis/AnyKernel3 --depth=1
+git clone https://github.com/Kernel-SU/AnyKernel3 --depth=1
 
 echo ">>> 清理 AnyKernel3 Git 信息..."
 rm -rf ./AnyKernel3/.git
@@ -419,10 +419,13 @@ if [[ "$USE_PATCH_LINUX" == "y" || "$USE_PATCH_LINUX" == "Y" ]]; then
 fi
 if [[ "$APPLY_BBR" == "y" || "$APPLY_BBR" == "Y" ]]; then
   ZIP_NAME="${ZIP_NAME}-bbr"
+fi
 if [[ "$APPLY_ADIOS" == "y" || "$APPLY_ADIOS" == "Y" ]]; then
   ZIP_NAME="${ZIP_NAME}-adios"
+fi
 if [[ "$APPLY_REKERNEL" == "y" || "$APPLY_REKERNEL" == "Y" ]]; then
   ZIP_NAME="${ZIP_NAME}-rek"
+fi
 if [[ "$APPLY_BBG" == "y" || "$APPLY_BBG" == "Y" ]]; then
   ZIP_NAME="${ZIP_NAME}-bbg"
 fi
