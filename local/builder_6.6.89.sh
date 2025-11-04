@@ -7,6 +7,10 @@ cd "$SCRIPT_DIR"
 
 # ===== 设置自定义参数 =====
 echo "===== 欧加真SM8750通用6.6.89 A15 OKI内核本地编译脚本 By Coolapk@cctv18 ====="
+
+read -p "是否强制更新所有仓库？(y/n，默认：n): " FORCE_UPDATE
+FORCE_UPDATE=${FORCE_UPDATE:-n}
+
 echo ">>> 读取用户配置..."
 MANIFEST=${MANIFEST:-oppo+oplus+realme}
 read -p "请输入自定义内核后缀（默认：android15-8-g29d86c5fc9dd-abogki428889875-4k）: " CUSTOM_SUFFIX
@@ -25,12 +29,12 @@ read -p "是否启用网络功能增强优化配置？(y/n，默认：y): " APPL
 APPLY_BETTERNET=${APPLY_BETTERNET:-y}
 read -p "是否添加 BBR 等一系列拥塞控制算法？(y添加/n禁用/d默认，默认：n): " APPLY_BBR
 APPLY_BBR=${APPLY_BBR:-n}
-read -p "是否启用ADIOS调度器？(y/n，默认：y): " APPLY_ADIOS
-APPLY_ADIOS=${APPLY_ADIOS:-y}
+read -p "是否启用ADIOS调度器？(y/n，默认：n): " APPLY_ADIOS
+APPLY_ADIOS=${APPLY_ADIOS:-n}
 read -p "是否启用Re-Kernel？(y/n，默认：n): " APPLY_REKERNEL
 APPLY_REKERNEL=${APPLY_REKERNEL:-n}
-read -p "是否启用内核级基带保护？(y/n，默认：y): " APPLY_BBG
-APPLY_BBG=${APPLY_BBG:-y}
+read -p "是否启用内核级基带保护？(y/n，默认：n): " APPLY_BBG
+APPLY_BBG=${APPLY_BBG:-n}
 
 if [[ "$KSU_BRANCH" == "y" || "$KSU_BRANCH" == "Y" ]]; then
   KSU_TYPE="SukiSU Ultra"
@@ -69,12 +73,27 @@ sudo rm -rf ./llvm.sh && wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh
 sudo ./llvm.sh 18 all
 
 # ===== 初始化仓库 =====
+if [[ "$FORCE_UPDATE" == "y" || "$FORCE_UPDATE" == "Y" ]]; then
+    echo ">>> 强制更新，正在删除旧的工作目录..."
+    rm -rf kernel_workspace
+fi
+
 echo ">>> 初始化仓库..."
-rm -rf kernel_workspace
-mkdir kernel_workspace
+mkdir -p kernel_workspace
 cd kernel_workspace
-git clone --depth=1 https://github.com/szh0721/android_kernel_common_oneplus_sm8750-C16 -b 6.6.89-13T common
+
+# 克隆或更新内核源码
+if [ ! -d "common" ]; then
+    git clone --depth=1 https://github.com/szh0721/android_kernel_common_oneplus_sm8750-C16 -b 6.6.89-13T common
+else
+    cd common
+    git fetch origin
+    git reset --hard origin/6.6.89-13T
+    git clean -fd
+    cd ..
+fi
 echo ">>> 初始化仓库完成"
+
 
 # ===== 清除 abi 文件、去除 -dirty 后缀 =====
 echo ">>> 正在清除 ABI 文件及去除 dirty 后缀..."
@@ -113,11 +132,28 @@ fi
 # ===== 克隆补丁仓库&应用 SUSFS 补丁 =====
 echo ">>> 克隆补丁仓库..."
 cd "$WORKDIR/kernel_workspace"
+
+# 克隆或更新补丁仓库
+clone_or_update() {
+    REPO_URL=$1
+    DIR_NAME=$2
+    BRANCH_NAME=$3
+    if [ ! -d "$DIR_NAME" ]; then
+        git clone "$REPO_URL" -b "$BRANCH_NAME" "$DIR_NAME"
+    else
+        cd "$DIR_NAME"
+        git fetch origin
+        git reset --hard "origin/$BRANCH_NAME"
+        git clean -fd
+        cd ..
+    fi
+}
+
 echo ">>> 应用 SUSFS&hook 补丁..."
 if [[ "$KSU_BRANCH" == "y" ]]; then
-  git clone https://github.com/shirkneko/susfs4ksu.git -b gki-android15-6.6
-  git clone https://github.com/ShirkNeko/SukiSU_patch.git
-  cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
+    clone_or_update https://github.com/shirkneko/susfs4ksu.git susfs4ksu gki-android15-6.6
+    clone_or_update https://github.com/ShirkNeko/SukiSU_patch.git SukiSU_patch main
+    cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
   if [[ "$APPLY_HOOKS" == "m" || "$APPLY_HOOKS" == "M" ]]; then
     cp ./SukiSU_patch/hooks/scope_min_manual_hooks_v1.5.patch ./common/
   fi
@@ -137,9 +173,9 @@ if [[ "$KSU_BRANCH" == "y" ]]; then
   fi
   patch -p1 -F 3 < 69_hide_stuff.patch || true
 else
-  git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android15-6.6
-  git clone https://github.com/WildKernels/kernel_patches.git
-  cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
+    clone_or_update https://gitlab.com/simonpunk/susfs4ksu.git susfs4ksu gki-android15-6.6
+    clone_or_update https://github.com/WildKernels/kernel_patches.git kernel_patches main
+    cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
   cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
   cp ./susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
   if [[ "$APPLY_HOOKS" == "m" || "$APPLY_HOOKS" == "M" ]]; then
@@ -169,8 +205,8 @@ cd ../
 # ===== 应用 LZ4 & ZSTD 补丁 =====
 if [[ "$APPLY_LZ4" == "y" || "$APPLY_LZ4" == "Y" ]]; then
   echo ">>> 正在添加lz4 1.10.0 & zstd 1.5.7补丁..."
-  git clone https://github.com/cctv18/oppo_oplus_realme_sm8750.git
-  cp ./oppo_oplus_realme_sm8750/zram_patch/001-lz4.patch ./common/
+    clone_or_update https://github.com/cctv18/oppo_oplus_realme_sm8750.git oppo_oplus_realme_sm8750 main
+    cp ./oppo_oplus_realme_sm8750/zram_patch/001-lz4.patch ./common/
   cp ./oppo_oplus_realme_sm8750/zram_patch/lz4armv8.S ./common/lib
   cp ./oppo_oplus_realme_sm8750/zram_patch/002-zstd.patch ./common/
   cd "$WORKDIR/kernel_workspace/common"
@@ -186,8 +222,8 @@ fi
 if [[ "$APPLY_LZ4KD" == "y" || "$APPLY_LZ4KD" == "Y" ]]; then
   echo ">>> 应用 LZ4KD 补丁..."
   if [[ "$KSU_BRANCH" == "n" || "$KSU_BRANCH" == "N" ]]; then
-    git clone https://github.com/ShirkNeko/SukiSU_patch.git
-  fi
+        clone_or_update https://github.com/ShirkNeko/SukiSU_patch.git SukiSU_patch main
+    fi
   cp -r ./SukiSU_patch/other/zram/lz4k/include/linux/* ./common/include/linux/
   cp -r ./SukiSU_patch/other/zram/lz4k/lib/* ./common/lib
   cp -r ./SukiSU_patch/other/zram/lz4k/crypto/* ./common/crypto
@@ -382,6 +418,7 @@ fi
 # ===== 克隆并打包 AnyKernel3 =====
 cd "$WORKDIR/kernel_workspace"
 echo ">>> 克隆 AnyKernel3 项目..."
+rm -rf AnyKernel3 # 确保每次都是新的
 git clone https://github.com/Kernel-SU/AnyKernel3 --depth=1
 
 echo ">>> 清理 AnyKernel3 Git 信息..."
