@@ -13,16 +13,16 @@ FORCE_UPDATE=${FORCE_UPDATE:-n}
 
 echo ">>> 读取用户配置..."
 MANIFEST=${MANIFEST:-oppo+oplus+realme}
-read -p "请输入自定义内核后缀（默认：android15-8-g29d86c5fc9dd-abogki428889875-4k）: " CUSTOM_SUFFIX
-CUSTOM_SUFFIX=${CUSTOM_SUFFIX:-android15-8-g29d86c5fc9dd-abogki428889875-4k}
+read -p "请输入自定义内核后缀（默认：android15-8-saber00050721-abogki000050721-4k）: " CUSTOM_SUFFIX
+CUSTOM_SUFFIX=${CUSTOM_SUFFIX:-android15-8-saber00050721-abogki000050721-4k}
 read -p "是否启用 KPM？(y/n，默认：n): " USE_PATCH_LINUX
 USE_PATCH_LINUX=${USE_PATCH_LINUX:-n}
 read -p "KSU分支版本(y=SukiSU Ultra, n=KernelSU Next, 默认：y): " KSU_BRANCH
 KSU_BRANCH=${KSU_BRANCH:-y}
 read -p "应用钩子类型 (manual/syscall/kprobes, m/s/k, 默认m): " APPLY_HOOKS
 APPLY_HOOKS=${APPLY_HOOKS:-m}
-read -p "是否应用 lz4 1.10.0 & zstd 1.5.7 补丁？(y/n，默认：y): " APPLY_LZ4
-APPLY_LZ4=${APPLY_LZ4:-y}
+read -p "是否应用 lz4 1.10.0 & zstd 1.5.7 补丁？(y/n，默认：n): " APPLY_LZ4
+APPLY_LZ4=${APPLY_LZ4:-n}
 read -p "是否应用 lz4kd 补丁？(y/n，默认：n): " APPLY_LZ4KD
 APPLY_LZ4KD=${APPLY_LZ4KD:-n}
 read -p "是否启用网络功能增强优化配置？(y/n，默认：y): " APPLY_BETTERNET
@@ -68,7 +68,7 @@ echo ">>> 安装构建依赖..."
 sudo apt-mark hold firefox && apt-mark hold libc-bin && apt-mark hold man-db
 sudo rm -rf /var/lib/man-db/auto-update
 sudo apt-get update
-sudo apt-get install --no-install-recommends -y curl bison flex clang binutils dwarves git lld pahole zip perl make gcc python3 python-is-python3 bc libssl-dev libelf-dev
+sudo apt-get install --no-install-recommends -y curl bison flex clang binutils dwarves git lld pahole zip perl make gcc python3 python-is-python3 bc libssl-dev libelf-dev cpio
 sudo rm -rf ./llvm.sh && wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh
 sudo ./llvm.sh 18 all
 
@@ -84,11 +84,11 @@ cd kernel_workspace
 
 # 克隆或更新内核源码
 if [ ! -d "common" ]; then
-    git clone --depth=1 https://github.com/szh0721/android_kernel_common_oneplus_sm8750-C16 -b 6.6.89-13T common
+    git clone --depth=1 https://github.com/szh0721/android_kernel_common_oneplus_sm8750-C16 -b 6.6.89-origin common
 else
     cd common
     git fetch origin
-    git reset --hard origin/6.6.89-13T
+    git reset --hard origin/6.6.89-origin
     git clean -fd
     cd ..
 fi
@@ -118,7 +118,9 @@ if [[ "$KSU_BRANCH" == "y" ]]; then
   echo ">>> 拉取 SukiSU-Ultra 并设置版本..."
   curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
   cd KernelSU
-  KSU_VERSION=$(expr $(/usr/bin/git rev-list --count main) "+" 10700)
+  #git fetch origin
+  #git reset --hard 0da8ecb07144f09ae51bcb46bdf1f08a81794776
+  KSU_VERSION=$(expr $(/usr/bin/git rev-list --count main) "+" 37185)
   export KSU_VERSION=$KSU_VERSION
   sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=${KSU_VERSION}/" kernel/Makefile
 else
@@ -155,7 +157,7 @@ if [[ "$KSU_BRANCH" == "y" ]]; then
     clone_or_update https://github.com/ShirkNeko/SukiSU_patch.git SukiSU_patch main
     cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
   if [[ "$APPLY_HOOKS" == "m" || "$APPLY_HOOKS" == "M" ]]; then
-    cp ./SukiSU_patch/hooks/scope_min_manual_hooks_v1.5.patch ./common/
+    cp ./SukiSU_patch/hooks/scope_min_manual_hooks_v1.6.patch ./common/
   fi
   if [[ "$APPLY_HOOKS" == "s" || "$APPLY_HOOKS" == "S" ]]; then
     cp ./SukiSU_patch/hooks/syscall_hooks.patch ./common/
@@ -165,9 +167,9 @@ if [[ "$KSU_BRANCH" == "y" ]]; then
   cp ./susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
   cd ./common
   patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch || true
-  if [[ "$APPLY_HOOKS" == "m" || "$APPLY_HOOKS" == "M" ]]; then
-    patch -p1 < scope_min_manual_hooks_v1.5.patch || true
-  fi
+  #if [[ "$APPLY_HOOKS" == "m" || "$APPLY_HOOKS" == "M" ]]; then
+    #patch -p1 < scope_min_manual_hooks_v1.6.patch || true
+  #fi
   if [[ "$APPLY_HOOKS" == "s" || "$APPLY_HOOKS" == "S" ]]; then
     patch -p1 < syscall_hooks.patch || true
   fi
@@ -178,18 +180,18 @@ else
     cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
   cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
   cp ./susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
-  if [[ "$APPLY_HOOKS" == "m" || "$APPLY_HOOKS" == "M" ]]; then
-    cp ./kernel_patches/next/scope_min_manual_hooks_v1.5.patch ./common/
-  fi
+  #if [[ "$APPLY_HOOKS" == "m" || "$APPLY_HOOKS" == "M" ]]; then
+    #cp ./kernel_patches/next/scope_min_manual_hooks_v1.6.patch ./common/
+  #fi
   if [[ "$APPLY_HOOKS" == "s" || "$APPLY_HOOKS" == "S" ]]; then
     cp ./kernel_patches/next/syscall_hooks.patch ./common/
   fi
   cp ./kernel_patches/69_hide_stuff.patch ./common/
   cd ./common
   patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch || true
-  if [[ "$APPLY_HOOKS" == "m" || "$APPLY_HOOKS" == "M" ]]; then
-    patch -p1 -N -F 3 < scope_min_manual_hooks_v1.5.patch || true
-  fi
+  #if [[ "$APPLY_HOOKS" == "m" || "$APPLY_HOOKS" == "M" ]]; then
+    #patch -p1 -N -F 3 < scope_min_manual_hooks_v1.6.patch || true
+  #fi
   if [[ "$APPLY_HOOKS" == "s" || "$APPLY_HOOKS" == "S" ]]; then
     patch -p1 -N -F 3 < syscall_hooks.patch || true
   fi
@@ -268,9 +270,9 @@ if [[ "$APPLY_HOOKS" == "k" || "$APPLY_HOOKS" == "K" ]]; then
   echo "CONFIG_KSU_SUSFS_SUS_SU=y" >> "$DEFCONFIG_FILE"
   echo "CONFIG_KSU_MANUAL_HOOK=n" >> "$DEFCONFIG_FILE"
   echo "CONFIG_KSU_KPROBES_HOOK=y" >> "$DEFCONFIG_FILE"
-else
-  echo "CONFIG_KSU_MANUAL_HOOK=y" >> "$DEFCONFIG_FILE"
-  echo "CONFIG_KSU_SUSFS_SUS_SU=n" >>  "$DEFCONFIG_FILE"
+#else
+  #echo "CONFIG_KSU_MANUAL_HOOK=y" >> "$DEFCONFIG_FILE"
+  #echo "CONFIG_KSU_SUSFS_SUS_SU=n" >>  "$DEFCONFIG_FILE"
 fi
 # 开启O2编译优化配置
 echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DEFCONFIG_FILE"
@@ -397,6 +399,12 @@ sed -i 's/check_defconfig//' ./common/build.config.gki
 # ===== 编译内核 =====
 echo ">>> 开始编译内核..."
 cd common
+
+export KBUILD_BUILD_USER="kleaf"
+export KBUILD_BUILD_HOST="build-host"
+export KBUILD_BUILD_TIMESTAMP="Thu Nov 13 01:56:53 UTC 2025"
+export KBUILD_BUILD_VERSION=1
+
 make -j$(nproc --all) LLVM=-18 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnuabeihf- CC=clang LD=ld.lld HOSTCC=clang HOSTLD=ld.lld O=out KCFLAGS+=-O2 KCFLAGS+=-Wno-error gki_defconfig all
 echo ">>> 内核编译成功！"
 
@@ -405,7 +413,7 @@ OUT_DIR="$WORKDIR/kernel_workspace/common/out/arch/arm64/boot"
 if [[ "$USE_PATCH_LINUX" == "y" || "$USE_PATCH_LINUX" == "Y" ]]; then
   echo ">>> 使用 patch_linux 工具处理输出..."
   cd "$OUT_DIR"
-  wget https://github.com/ShirkNeko/SukiSU_KernelPatch_patch/releases/download/0.12.0/patch_linux
+  wget https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/latest/download/patch_linux
   chmod +x patch_linux
   ./patch_linux
   rm -f Image
