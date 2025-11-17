@@ -34,7 +34,7 @@ APPLY_ADIOS=${APPLY_ADIOS:-n}
 read -p "是否启用Re-Kernel？(y/n，默认：n): " APPLY_REKERNEL
 APPLY_REKERNEL=${APPLY_REKERNEL:-n}
 read -p "是否启用内核级基带保护？(y/n，默认：n): " APPLY_BBG
-APPLY_BBG=${APPLY_BBG:-n}
+APPLY_BBG=${APPLY_BBG:-y}
 
 if [[ "$KSU_BRANCH" == "y" || "$KSU_BRANCH" == "Y" ]]; then
   KSU_TYPE="SukiSU Ultra"
@@ -365,9 +365,8 @@ if [[ "$APPLY_BBG" == "y" || "$APPLY_BBG" == "Y" ]]; then
   echo ">>> 正在启用内核级基带保护..."
   echo "CONFIG_BBG=y" >> "$DEFCONFIG_FILE"
   cd ./common/security
-  wget https://github.com/cctv18/Baseband-guard/archive/refs/heads/master.zip
-  unzip -q master.zip
-  mv "Baseband-guard-master" baseband-guard
+  # [FIXED] Use clone_or_update to prevent issues on subsequent runs
+  clone_or_update https://github.com/cctv18/Baseband-guard.git baseband-guard master
   printf '\nobj-$(CONFIG_BBG) += baseband-guard/\n' >> ./Makefile
   sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./Kconfig
   awk '
